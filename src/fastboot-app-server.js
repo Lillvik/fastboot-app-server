@@ -24,16 +24,17 @@ class FastBootAppServer {
     this.beforeMiddleware = options.beforeMiddleware;
     this.afterMiddleware = options.afterMiddleware;
     this.sandboxGlobals = options.sandboxGlobals;
+    this.noCluster = options.noCluster;
     this.chunkedResponse = options.chunkedResponse;
 
     if (!this.ui) {
       let UI = require('./ui');
-      this.ui = new UI();
+      this.ui = new UI(this.noCluster);
     }
 
     this.propagateUI();
 
-    if (cluster.isWorker) {
+    if (this.noCluster || cluster.isWorker) {
       this.worker = new Worker({
         ui: this.ui,
         distPath: this.distPath || process.env.FASTBOOT_DIST_PATH,
@@ -50,7 +51,9 @@ class FastBootAppServer {
         chunkedResponse: this.chunkedResponse,
       });
 
+      if(!this.noCluster){
       this.worker.start();
+      }
     } else {
       this.workerCount = options.workerCount ||
         (process.env.NODE_ENV === 'test' ? 1 : null) ||
@@ -62,6 +65,11 @@ class FastBootAppServer {
   }
 
   start() {
+    if(this.noCluster){
+      this.worker.start();
+      return;
+    }
+
     if (cluster.isWorker) { return; }
 
     return this.initializeApp()
